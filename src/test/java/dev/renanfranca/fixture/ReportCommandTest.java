@@ -178,6 +178,22 @@ class ReportCommandTest {
   }
 
   @Test
+  void rejectsUnicodeDuplicateNamesIgnoringCaseWithoutAPartialReport() {
+    Execution execution = execute(
+      "--item", "İ=passed",
+      "--item", "i=failed"
+    );
+
+    assertEquals(2, execution.exitCode());
+    assertEquals("", execution.output());
+    assertEquals(
+      "Invalid item 'i=failed': duplicate name; "
+        + "expected nome=passed|failed|skipped\n",
+      execution.error()
+    );
+  }
+
+  @Test
   void rejectsAMalformedItemWithoutAPartialReport() {
     Execution execution = execute(
       "--item", "valid=passed",

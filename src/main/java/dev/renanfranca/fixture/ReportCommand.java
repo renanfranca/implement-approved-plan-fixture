@@ -3,10 +3,10 @@ package dev.renanfranca.fixture;
 import java.io.PrintWriter;
 import java.io.Serial;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -73,10 +73,10 @@ public final class ReportCommand implements Callable<Integer> {
 
   private List<ReportItem> parseItems() {
     List<ReportItem> reportItems = new ArrayList<>();
-    Set<String> normalizedNames = new HashSet<>();
+    Set<String> normalizedNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
     for (String item : items) {
       ReportItem reportItem = parseItem(item);
-      if (!normalizedNames.add(reportItem.name().toLowerCase(Locale.ROOT))) {
+      if (!normalizedNames.add(reportItem.name())) {
         throw new InvalidItemException(item, "duplicate name; ");
       }
       reportItems.add(reportItem);
