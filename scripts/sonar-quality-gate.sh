@@ -61,9 +61,47 @@ new_issues=$(curl --silent --fail --user "$token:" \
   "$sonar_url/api/issues/search?componentKeys=$project_key&resolved=false&sinceLeakPeriod=true&ps=1" |
   jq -r '.total')
 measures=$(curl --silent --fail --user "$token:" \
-  "$sonar_url/api/measures/component?component=$project_key&metricKeys=new_coverage,new_duplicated_lines_density")
-new_coverage=$(jq -r '.component.measures[] | select(.metric == "new_coverage") | .period.value' <<<"$measures")
-new_duplication=$(jq -r '.component.measures[] | select(.metric == "new_duplicated_lines_density") | .period.value' <<<"$measures")
+  "$sonar_url/api/measures/component?component=$project_key&metricKeys=new_coverage,new_duplicated_lines_density,new_lines,new_lines_to_cover,new_uncovered_lines,new_uncovered_conditions,new_duplicated_lines,new_duplicated_blocks")
+
+metric_value() {
+  local metric=$1
+  jq -r --arg metric "$metric" '
+    [.component.measures[] | select(.metric == $metric)] |
+    if length == 0 then "__MISSING__"
+    elif length > 1 then "__DUPLICATE__"
+    elif .[0].period.value == null then "__NO_VALUE__"
+    else (.[0].period.value | tostring)
+    end
+  ' <<<"$measures"
+}
+
+require_metric_value() {
+  local metric=$1
+  local value=$2
+  local expected=$3
+  if [[ "$value" == "__MISSING__" ]]; then
+    echo "Missing Sonar metric $metric" >&2
+    exit 1
+  fi
+  if [[ ! "$value" =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
+    echo "Expected numeric Sonar metric $metric, observed $value" >&2
+    exit 1
+  fi
+  awk -v value="$value" -v expected="$expected" \
+    'BEGIN { exit !(value == expected) }' || {
+    echo "Expected $metric=$expected, observed $value" >&2
+    exit 1
+  }
+}
+
+new_coverage=$(metric_value new_coverage)
+new_duplication=$(metric_value new_duplicated_lines_density)
+new_lines=$(metric_value new_lines)
+new_lines_to_cover=$(metric_value new_lines_to_cover)
+new_uncovered_lines=$(metric_value new_uncovered_lines)
+new_uncovered_conditions=$(metric_value new_uncovered_conditions)
+new_duplicated_lines=$(metric_value new_duplicated_lines)
+new_duplicated_blocks=$(metric_value new_duplicated_blocks)
 
 [[ "$quality_status" == "OK" ]] || {
   echo "Quality Gate is $quality_status" >&2
@@ -73,15 +111,27 @@ new_duplication=$(jq -r '.component.measures[] | select(.metric == "new_duplicat
   echo "Expected zero new issues, observed $new_issues" >&2
   exit 1
 }
-awk -v value="$new_coverage" 'BEGIN { exit !(value == 100) }' || {
-  echo "Expected 100% new coverage, observed $new_coverage" >&2
-  exit 1
-}
-awk -v value="$new_duplication" 'BEGIN { exit !(value == 0) }' || {
-  echo "Expected 0% new duplication, observed $new_duplication" >&2
-  exit 1
-}
 
-printf 'Quality Gate=%s new_issues=%s new_coverage=%s new_duplication=%s\n' \
-  "$quality_status" "$new_issues" "$new_coverage" "$new_duplication"
+if [[ "$new_coverage" == "__MISSING__" ]]; then
+  require_metric_value new_lines_to_cover "$new_lines_to_cover" 0
+  require_metric_value new_uncovered_lines "$new_uncovered_lines" 0
+  require_metric_value new_uncovered_conditions "$new_uncovered_conditions" 0
+  new_coverage="N/A (0/0)"
+else
+  require_metric_value new_coverage "$new_coverage" 100
+fi
 
+if [[ "$new_duplication" == "__MISSING__" ]]; then
+  require_metric_value new_lines "$new_lines" 0
+  require_metric_value new_duplicated_lines "$new_duplicated_lines" 0
+  require_metric_value new_duplicated_blocks "$new_duplicated_blocks" 0
+  new_duplication="N/A (0/0)"
+else
+  require_metric_value new_duplicated_lines_density "$new_duplication" 0
+fi
+
+printf 'Quality Gate=%s new_issues=%s new_coverage=%s new_duplication=%s new_lines=%s new_lines_to_cover=%s new_uncovered_lines=%s new_uncovered_conditions=%s new_duplicated_lines=%s new_duplicated_blocks=%s\n' \
+  "$quality_status" "$new_issues" "$new_coverage" "$new_duplication" \
+  "$new_lines" "$new_lines_to_cover" "$new_uncovered_lines" \
+  "$new_uncovered_conditions" "$new_duplicated_lines" \
+  "$new_duplicated_blocks"
