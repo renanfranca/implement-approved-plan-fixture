@@ -1,1 +1,5 @@
 plugins = ["java"]
+transformers = ["snooze-until-changed"]
+
+[scope]
+branchBase = "9960b9ac959b6ae24febf9bc5aaa036763f08efd"
