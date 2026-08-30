@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import picocli.CommandLine;
 
 class ReportCommandTest {
@@ -131,32 +133,19 @@ class ReportCommandTest {
     );
   }
 
-  @Test
-  void rejectsAnEmptyItemNameWithoutAPartialReport() {
+  @ParameterizedTest
+  @ValueSource(strings = {"  =failed", "broken=unknown", "broken"})
+  void rejectsInvalidItemsWithoutAPartialReport(String invalidItem) {
     Execution execution = execute(
       "--item", "valid=passed",
-      "--item", "  =failed"
+      "--item", invalidItem
     );
 
     assertEquals(2, execution.exitCode());
     assertEquals("", execution.output());
     assertEquals(
-      "Invalid item '  =failed': expected nome=passed|failed|skipped\n",
-      execution.error()
-    );
-  }
-
-  @Test
-  void rejectsAnUnsupportedStatusWithoutAPartialReport() {
-    Execution execution = execute(
-      "--item", "valid=passed",
-      "--item", "broken=unknown"
-    );
-
-    assertEquals(2, execution.exitCode());
-    assertEquals("", execution.output());
-    assertEquals(
-      "Invalid item 'broken=unknown': expected nome=passed|failed|skipped\n",
+      "Invalid item '" + invalidItem
+        + "': expected nome=passed|failed|skipped\n",
       execution.error()
     );
   }
@@ -189,21 +178,6 @@ class ReportCommandTest {
     assertEquals(
       "Invalid item 'i=failed': duplicate name; "
         + "expected nome=passed|failed|skipped\n",
-      execution.error()
-    );
-  }
-
-  @Test
-  void rejectsAMalformedItemWithoutAPartialReport() {
-    Execution execution = execute(
-      "--item", "valid=passed",
-      "--item", "broken"
-    );
-
-    assertEquals(2, execution.exitCode());
-    assertEquals("", execution.output());
-    assertEquals(
-      "Invalid item 'broken': expected nome=passed|failed|skipped\n",
       execution.error()
     );
   }
