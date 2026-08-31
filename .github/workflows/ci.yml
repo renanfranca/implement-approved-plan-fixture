@@ -21,7 +21,7 @@ jobs:
         ports:
           - 9000:9000
         options: >-
-          --health-cmd "curl --silent --fail http://localhost:9000/api/system/status | grep --quiet '\"status\":\"UP\"'"
+          --health-cmd "curl --silent --fail --output /tmp/sonar-system-status.json http://localhost:9000/api/system/status && grep --quiet '\"status\":\"UP\"' /tmp/sonar-system-status.json"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 30
